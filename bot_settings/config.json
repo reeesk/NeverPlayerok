@@ -1,0 +1,68 @@
+{
+    "playerok": {
+        "api": {
+            "cookies": "",
+            "user_agent": "",
+            "proxy": "",
+            "requests_timeout": 30
+        },
+        "watermark": {
+            "enabled": false,
+            "value": "playerok-neverboost"
+        },
+        "read_chat": true,
+        "auto_restore_items": {
+            "sold": true,
+            "expired": false,
+            "all": true
+        },
+        "auto_complete_deals": {
+            "enabled": false,
+            "all": true
+        },
+        "auto_bump_items": {
+            "enabled": false,
+            "interval": 3600,
+            "all": false,
+            "last_time": ""
+        },
+        "auto_withdrawal": {
+            "enabled": false,
+            "interval": 86400,
+            "last_time": "",
+            "credentials_type": "",
+            "card_id": "",
+            "sbp_bank_id": "",
+            "sbp_phone_number": "",
+            "usdt_address": ""
+        },
+        "notifications": {
+            "enabled": true,
+            "chat_id": "",
+            "events": {
+                "new_user_message": true,
+                "new_system_message": true,
+                "new_deal": true,
+                "new_review": true,
+                "new_problem": true,
+                "deal_status_changed": true,
+                "item_restored": true,
+                "item_bumped": true,
+                "withdrawal_requested": true
+            }
+        }
+    },
+    "telegram": {
+        "api": {
+            "token": "",
+            "proxy": ""
+        },
+        "bot": {
+            "password": "",
+            "signed_users": []
+        }
+    },
+    "logs": {
+        "max_file_size": 300
+    }
+}

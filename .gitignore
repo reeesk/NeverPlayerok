@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Runtime logs
+logs/*
+!logs/.gitkeep
+
+# Runtime bot data
+bot_data/*
+!bot_data/.gitkeep
+
+# Runtime module data
+modules/neverboost_playerok/module_data/*
+!modules/neverboost_playerok/module_data/.gitkeep
