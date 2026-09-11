@@ -76,28 +76,44 @@ async def main() -> None:
     automation_task = asyncio.create_task(automation.background_loop())
 
     async def handle(event) -> None:
-        if event.type is EventTypes.NEW_DEAL:
+        if event.type is EventTypes.NEW_DEAL or event.type is EventTypes.ITEM_PAID:
             deal = event.deal
-            binding_match = adapter.binding_for_deal(deal, settings.lot_bindings or {})
-            if not binding_match:
-                return
-            _, binding = binding_match
-            duration = str(binding.get("duration", "oneMonth"))
-            quantity = max(int(binding.get("boosts_per_unit", 1) or 1), 1)
-            if service.register_paid_deal(str(deal.id), str(event.chat.id), str(deal.item.id), duration, quantity):
-                await adapter.transport.send_message(str(event.chat.id), order_invite_message(quantity))
-            await automation.complete_deal(deal)
+            if event.type is EventTypes.NEW_DEAL:
+                binding_match = adapter.binding_for_deal(deal, store.get("lot_bindings", default={}))
+                if not binding_match:
+                    logger.warning("Пропущена сделка %s: не найдена привязка лота (item_id=%s, name=%r)", deal.id, getattr(getattr(deal, "item", None), "id", None), getattr(getattr(deal, "item", None), "name", None))
+                    return
+                _, binding = binding_match
+                duration = str(binding.get("duration", "oneMonth"))
+                quantity = max(int(binding.get("boosts_per_unit", 1) or 1), 1)
+                if service.register_paid_deal(str(deal.id), str(event.chat.id), str(getattr(deal.item, "id", "")), duration, quantity):
+                    await adapter.transport.send_message(str(event.chat.id), order_invite_message(quantity))
+            else:
+                # ITEM_PAID is the reliable payment event. It may arrive even
+                # when the preceding NEW_DEAL payload had incomplete item data.
+                if repository.get(str(deal.id)) is None:
+                    binding_match = adapter.binding_for_deal(deal, store.get("lot_bindings", default={}))
+                    if binding_match:
+                        _, binding = binding_match
+                        duration = str(binding.get("duration", "oneMonth"))
+                        quantity = max(int(binding.get("boosts_per_unit", 1) or 1), 1)
+                        if service.register_paid_deal(str(deal.id), str(event.chat.id), str(getattr(deal.item, "id", "")), duration, quantity):
+                            await adapter.transport.send_message(str(event.chat.id), order_invite_message(quantity))
+                    else:
+                        logger.warning("ITEM_PAID %s получен, но привязка лота не найдена", deal.id)
+                await automation.restore_sold_item(deal)
             await plugins.dispatch(event.type.name, adapter, event)
         elif event.type is EventTypes.NEW_MESSAGE:
             message = event.message
             if getattr(message.user, "id", None) == account.id:
                 return
-            row = repository.waiting_for_chat(str(event.chat.id))
+            message_deal = getattr(getattr(message, "deal", None), "id", None)
+            row = repository.get(str(message_deal)) if message_deal else None
+            row = row or repository.waiting_for_chat(str(event.chat.id))
             if row:
                 await adapter.on_message(row["deal_id"], str(event.chat.id), str(getattr(message, "text", "") or ""))
-            await plugins.dispatch(event.type.name, adapter, event)
-        elif event.type is EventTypes.ITEM_PAID:
-            await automation.restore_sold_item(event.deal)
+            else:
+                logger.warning("Сообщение покупателя %s не связано с ожидающей сделкой (chat_id=%s)", getattr(message, "id", "?"), event.chat.id)
             await plugins.dispatch(event.type.name, adapter, event)
         elif event.type is EventTypes.DEAL_STATUS_CHANGED:
             if str(getattr(getattr(event.deal, "status", None), "name", "")).upper() == "ROLLED_BACK":

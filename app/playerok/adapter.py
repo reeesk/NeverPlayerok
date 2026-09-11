@@ -53,4 +53,10 @@ class PlayerokEventAdapter:
             title = str(binding.get("item_title", "") or "").lower()
             if str(binding_id) == item_id or (title and (title in item_name or item_name in title)):
                 return str(binding_id), binding
+        # Some Playerok events contain a shortened item object without a name.
+        # A configured title can still identify the only configured lot.
+        if len(bindings) == 1:
+            binding_id, binding = next(iter(bindings.items()))
+            if isinstance(binding, dict):
+                return str(binding_id), binding
         return None
