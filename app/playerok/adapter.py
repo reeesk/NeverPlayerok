@@ -1,0 +1,51 @@
+from dataclasses import dataclass
+from typing import Protocol
+import re
+
+
+@dataclass(frozen=True)
+class PaidDeal:
+    deal_id: str
+    chat_id: str
+    item_id: str
+    duration: str
+    quantity: int
+
+
+class PlayerokTransport(Protocol):
+    async def send_message(self, chat_id: str, text: str) -> None: ...
+
+
+class PlayerokEventAdapter:
+    """Thin boundary between the real Playerok listener and order business logic."""
+
+    def __init__(self, transport: PlayerokTransport, orders, plugins=None) -> None:
+        self.transport = transport
+        self.orders = orders
+        self.plugins = plugins
+
+    async def on_paid_deal(self, deal: PaidDeal) -> None:
+        if self.orders.register_paid_deal(deal.deal_id, deal.chat_id, deal.item_id, deal.duration, deal.quantity):
+            await self.transport.send_message(deal.chat_id, "Спасибо за заказ! Отправьте Discord-ссылку для буста, например discord.gg/example")
+
+    async def on_message(self, deal_id: str, chat_id: str, text: str) -> None:
+        accepted, response = await self.orders.accept_message(deal_id, text)
+        await self.transport.send_message(chat_id, response)
+        if accepted:
+            await self.orders.wait_for_completion(
+                deal_id,
+                lambda message: self.transport.send_message(chat_id, message),
+            )
+
+    @staticmethod
+    def binding_for_deal(deal, bindings: dict[str, dict]) -> tuple[str, dict] | None:
+        item = getattr(deal, "item", None)
+        item_id = str(getattr(item, "id", "") or "")
+        item_name = str(getattr(item, "name", "") or "").lower()
+        for binding_id, binding in bindings.items():
+            if not isinstance(binding, dict):
+                continue
+            title = str(binding.get("item_title", "") or "").lower()
+            if str(binding_id) == item_id or (title and (title in item_name or item_name in title)):
+                return str(binding_id), binding
+        return None

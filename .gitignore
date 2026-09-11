@@ -15,3 +15,13 @@ bot_data/*
 # Runtime module data
 modules/neverboost_playerok/module_data/*
 !modules/neverboost_playerok/module_data/.gitkeep
+*.env
+.env
+data/*.sqlite3
+__pycache__/
+.pytest_cache/
+data/*.json
+!data/config.example.json
+logs/*
+!logs/.gitkeep
+.venv/

@@ -1,0 +1,30 @@
+{
+  "playerok": {
+    "cookies": "",
+    "user_agent": "",
+    "proxy": "",
+    "timeout": 30
+  },
+  "neverboost": {
+    "api_key": "",
+    "url": "https://api.neverboost.com"
+  },
+  "telegram": {
+    "token": "",
+    "proxy": "",
+    "admins": []
+  },
+  "features": {
+    "auto_restore": true,
+    "auto_complete": false,
+    "auto_bump": false,
+    "notifications": true
+  },
+  "lot_bindings": {},
+  "runtime": {
+    "orders_file": "data/orders.json",
+    "plugins_dir": "plugins",
+    "poll_interval": 5,
+    "automation_interval": 3600
+  }
+}
