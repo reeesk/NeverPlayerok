@@ -7,3 +7,7 @@ curl-cffi>=0.13,<1
 websocket-client>=1.8,<2
 wrapper-tls-requests==1.1.4
 tqdm>=4.67,<5
+requests==2.32.3
+requests-toolbelt==0.10.1
+urllib3==1.26.16
+certifi>=2025.1.31
