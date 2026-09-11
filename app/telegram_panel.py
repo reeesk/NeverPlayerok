@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from app.neverboost.client import NeverBoostClient, NeverBoostError
 from app.settings_store import SettingsStore
+import updater
 
 logger = logging.getLogger("neverboost-playerok.telegram")
 
@@ -19,7 +20,7 @@ def keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="📊 Обзор", callback_data="screen:status"), InlineKeyboardButton(text="💰 NeverBoost", callback_data="screen:api")],
         [InlineKeyboardButton(text="⚙️ Автоматизация", callback_data="screen:features"), InlineKeyboardButton(text="📦 Мои лоты", callback_data="screen:lots")],
         [InlineKeyboardButton(text="🧾 Заказы", callback_data="screen:orders"), InlineKeyboardButton(text="🔧 Подключение", callback_data="screen:connection")],
-        [InlineKeyboardButton(text="🔄 Обновить", callback_data="screen:menu")],
+        [InlineKeyboardButton(text="🆕 Обновить бота", callback_data="update:check"), InlineKeyboardButton(text="🔄 Обновить меню", callback_data="screen:menu")],
     ])
 
 
@@ -129,7 +130,30 @@ class TelegramPanel:
 
     async def callback(self, query: CallbackQuery) -> None:
         action = query.data or "screen:menu"
-        if action.startswith("toggle:"):
+        if action == "update:check":
+            await query.answer("Проверяю GitHub...", show_alert=False)
+            try:
+                available, current, latest = await asyncio.to_thread(updater.update_available)
+                if not available:
+                    await query.message.edit_text("✅ У вас последняя версия.", reply_markup=back_keyboard())
+                else:
+                    buttons = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="⬇️ Установить и перезапустить", callback_data="update:install")],
+                        [InlineKeyboardButton(text="⬅️ Назад", callback_data="screen:menu")],
+                    ])
+                    await query.message.edit_text(f"🆕 Доступно обновление\n\nТекущая: <code>{current[:8]}</code>\nНовая: <code>{latest[:8]}</code>", reply_markup=buttons)
+            except Exception as exc:
+                await query.message.edit_text(f"❌ Не удалось проверить обновления:\n<code>{html.escape(str(exc))}</code>", reply_markup=back_keyboard())
+        elif action == "update:install":
+            await query.message.edit_text("⏳ Устанавливаю обновление и перезапускаю бота...")
+            try:
+                await asyncio.to_thread(updater.install_update)
+                await query.message.edit_text("✅ Обновление установлено. Перезапуск...")
+                await asyncio.sleep(1)
+                updater.restart()
+            except Exception as exc:
+                await query.message.edit_text(f"❌ Обновление не установлено:\n<code>{html.escape(str(exc))}</code>", reply_markup=back_keyboard())
+        elif action.startswith("toggle:"):
             feature = action.split(":", 1)[1]
             current = bool(self.store.get("features", feature, default=False))
             self.store.set("features", feature, value=not current)
