@@ -33,6 +33,7 @@ class OrderRepository:
                 "duration": duration, "quantity": quantity, "status": "waiting_invite",
                 "invite_url": None, "api_order_id": None,
                 "last_message_id": None,
+                "confirmation_at": None,
             }
             self._save()
             return True

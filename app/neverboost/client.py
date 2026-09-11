@@ -36,8 +36,12 @@ class NeverBoostClient:
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         logger.info("NeverBoost API: %s %s", method, path)
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.request(method, f"{self.base_url}{path}", headers=self._headers(), **kwargs)
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.request(method, f"{self.base_url}{path}", headers=self._headers(), **kwargs)
+        except httpx.HTTPError as exc:
+            logger.warning("NeverBoost API: %s %s -> %s", method, path, exc.__class__.__name__)
+            raise NeverBoostError(f"NeverBoost API недоступен: {exc.__class__.__name__}") from exc
         try:
             data = response.json() if response.content else {}
         except ValueError:
