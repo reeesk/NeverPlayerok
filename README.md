@@ -33,6 +33,8 @@
 
 На Windows запустите `install.bat`. Wizard создаст `.venv`, установит зависимости и сохранит настройки в `data/config.json`.
 
+Установщик отдельно ставит `wrapper-tls-requests`, который нужен локальному `playerokapi` для импорта `tls_requests`.
+
 Можно также запустить мастер вручную:
 
 ```powershell

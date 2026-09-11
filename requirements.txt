@@ -5,3 +5,5 @@ aiogram>=3.11,<4
 beautifulsoup4>=4.12,<5
 curl-cffi>=0.13,<1
 websocket-client>=1.8,<2
+wrapper-tls-requests==1.1.4
+tqdm>=4.67,<5
