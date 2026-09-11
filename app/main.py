@@ -27,15 +27,26 @@ async def main() -> None:
     service = OrderService(repository, NeverBoostClient(settings.neverboost_url, settings.neverboost_api_key))
 
     from playerokapi.account import Account
+    from playerokapi.exceptions import UnauthorizedError
     from playerokapi.listener.events import EventTypes
     from playerokapi.listener.listener import EventListener
 
     account = Account(
+        token=settings.playerok_token or None,
+        ddg5=settings.playerok_ddg5,
         cookies=settings.playerok_cookies,
         user_agent=settings.playerok_user_agent,
         proxy=settings.playerok_proxy or None,
         requests_timeout=30,
-    ).get()
+    )
+    try:
+        account = account.get()
+    except UnauthorizedError as exc:
+        raise RuntimeError(
+            "Playerok не авторизовал аккаунт. Проверьте data/config.json: "
+            "укажите свежие cookies с token и __ddg5_ либо отдельные token/ddg5. "
+            "Cookies должны соответствовать User-Agent и прокси."
+        ) from exc
 
     class Transport:
         async def send_message(self, chat_id: str, text: str) -> None:

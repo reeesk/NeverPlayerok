@@ -1,6 +1,8 @@
 {
   "playerok": {
     "cookies": "",
+    "token": "",
+    "ddg5": "",
     "user_agent": "",
     "proxy": "",
     "timeout": 30

@@ -43,6 +43,8 @@ python installer.py
 
 Поддерживаются Playerok HTTP/HTTPS/SOCKS-прокси в формате `scheme://user:password@host:port`. Настройки прокси сохраняются в JSON и передаются в Playerok-клиент.
 
+Для авторизации Playerok укажите в мастере либо полный cookie string, содержащий `token` и `__ddg5_`, либо отдельные `token` и `__ddg5_`. Они должны быть свежими и соответствовать User-Agent и прокси. При смене IP или User-Agent cookie `__ddg5_` может стать недействительной.
+
 ## Telegram-панель
 
 В installer укажите токен бота и Telegram ID администраторов. После запуска доступны:

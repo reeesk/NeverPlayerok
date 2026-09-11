@@ -15,6 +15,8 @@ class Settings:
     lot_bindings: dict[str, dict] | None = None
     plugins_dir: str = "plugins"
     playerok_proxy: str = ""
+    playerok_token: str = ""
+    playerok_ddg5: str = ""
     telegram_token: str = ""
     telegram_proxy: str = ""
     automation_interval: int = 3600
@@ -38,6 +40,8 @@ class Settings:
             lot_bindings=data.get("lot_bindings", {}) if isinstance(data.get("lot_bindings", {}), dict) else {},
             plugins_dir=str(runtime.get("plugins_dir", "plugins")),
             playerok_proxy=str(playerok.get("proxy", "")),
+            playerok_token=str(playerok.get("token", "")),
+            playerok_ddg5=str(playerok.get("ddg5", playerok.get("__ddg5_", ""))),
             telegram_token=str(data.get("telegram", {}).get("token", "")),
             telegram_proxy=str(data.get("telegram", {}).get("proxy", "")),
             automation_interval=max(int(runtime.get("automation_interval", 3600)), 60),
@@ -60,6 +64,8 @@ class Settings:
             lot_bindings=bindings if isinstance(bindings, dict) else {},
             plugins_dir=os.getenv("PLUGINS_DIR", "plugins"),
             playerok_proxy=os.getenv("PLAYEROK_PROXY", ""),
+            playerok_token=os.getenv("PLAYEROK_TOKEN", ""),
+            playerok_ddg5=os.getenv("PLAYEROK_DDG5", ""),
             telegram_token=os.getenv("TELEGRAM_TOKEN", ""),
             telegram_proxy=os.getenv("TELEGRAM_PROXY", ""),
         )

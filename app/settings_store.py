@@ -5,7 +5,7 @@ from typing import Any
 
 
 DEFAULT_CONFIG = {
-    "playerok": {"cookies": "", "user_agent": "", "proxy": "", "timeout": 30},
+    "playerok": {"cookies": "", "token": "", "ddg5": "", "user_agent": "", "proxy": "", "timeout": 30},
     "neverboost": {"api_key": "", "url": "https://api.neverboost.com"},
     "telegram": {"token": "", "proxy": "", "admins": []},
     "features": {
