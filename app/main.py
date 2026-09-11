@@ -17,6 +17,15 @@ from app.telegram_panel import TelegramPanel
 logger = logging.getLogger("neverboost-playerok")
 
 
+def order_invite_message(quantity: int) -> str:
+    quantity = max(int(quantity), 1)
+    return (
+        "👋 Спасибо за ваш заказ! Пожалуйста, отправьте ссылку на ваш Discord сервер для буста!\n"
+        f"📦 К выдаче: {quantity} буст(ов).\n"
+        "Пример: discord.gg/neverboost"
+    )
+
+
 async def main() -> None:
     load_dotenv()
     store = SettingsStore()
@@ -76,7 +85,7 @@ async def main() -> None:
             duration = str(binding.get("duration", "oneMonth"))
             quantity = max(int(binding.get("boosts_per_unit", 1) or 1), 1)
             if service.register_paid_deal(str(deal.id), str(event.chat.id), str(deal.item.id), duration, quantity):
-                await adapter.transport.send_message(str(event.chat.id), "Спасибо за заказ! Отправьте Discord-ссылку для буста, например discord.gg/example")
+                await adapter.transport.send_message(str(event.chat.id), order_invite_message(quantity))
             await automation.complete_deal(deal)
             await plugins.dispatch(event.type.name, adapter, event)
         elif event.type is EventTypes.NEW_MESSAGE:

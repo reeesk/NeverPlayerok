@@ -26,7 +26,12 @@ class PlayerokEventAdapter:
 
     async def on_paid_deal(self, deal: PaidDeal) -> None:
         if self.orders.register_paid_deal(deal.deal_id, deal.chat_id, deal.item_id, deal.duration, deal.quantity):
-            await self.transport.send_message(deal.chat_id, "Спасибо за заказ! Отправьте Discord-ссылку для буста, например discord.gg/example")
+            await self.transport.send_message(
+                deal.chat_id,
+                "👋 Спасибо за ваш заказ! Пожалуйста, отправьте ссылку на ваш Discord сервер для буста!\n"
+                f"📦 К выдаче: {max(int(deal.quantity), 1)} буст(ов).\n"
+                "Пример: discord.gg/neverboost",
+            )
 
     async def on_message(self, deal_id: str, chat_id: str, text: str) -> None:
         accepted, response = await self.orders.accept_message(deal_id, text)
