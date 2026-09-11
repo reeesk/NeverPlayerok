@@ -4,6 +4,7 @@ import logging
 import httpx
 
 from app.delivery.invite import Invite
+from app.network import normalize_proxy
 
 logger = logging.getLogger("neverboost-playerok.invites")
 
@@ -15,10 +16,10 @@ class InviteInspection:
     join_requests: bool = False
 
 
-async def inspect_invite(invite: Invite) -> InviteInspection:
+async def inspect_invite(invite: Invite, proxy: str | None = None) -> InviteInspection:
     logger.info("Проверка Discord-инвайта: %s", invite.url)
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, proxy=normalize_proxy(proxy)) as client:
             response = await client.get(
                 f"https://discord.com/api/v9/invites/{invite.code}?with_counts=true",
                 headers={"User-Agent": "NeverPlayerok/1.0"},
@@ -36,6 +37,6 @@ async def inspect_invite(invite: Invite) -> InviteInspection:
         )
         logger.info("Discord-инвайт принят: server=%s join_requests=%s", result.server_name, result.join_requests)
         return result
-    except (httpx.HTTPError, ValueError, TypeError):
-        logger.exception("Ошибка проверки Discord-инвайта")
+    except (httpx.HTTPError, ValueError, TypeError) as exc:
+        logger.warning("Discord-инвайт не удалось проверить: %s", exc.__class__.__name__)
         return InviteInspection(False)

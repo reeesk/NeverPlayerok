@@ -16,6 +16,7 @@ from app.plugins.manager import PluginManager
 from app.settings_store import SettingsStore
 from app.telegram_panel import TelegramPanel
 from app.logging_setup import configure_logging
+from app.network import normalize_proxy
 
 logger = logging.getLogger("neverboost-playerok")
 
@@ -51,7 +52,7 @@ async def main() -> None:
         ddg5=settings.playerok_ddg5,
         cookies=settings.playerok_cookies,
         user_agent=settings.playerok_user_agent,
-        proxy=settings.playerok_proxy or None,
+        proxy=normalize_proxy(settings.playerok_proxy),
         requests_timeout=30,
     )
     try:
@@ -105,7 +106,7 @@ async def main() -> None:
                             has_invite_field = True
                             candidate = extract_invite(getattr(field, "value", "") or "")
                             if candidate:
-                                inspection = await inspect_invite(candidate)
+                                inspection = await inspect_invite(candidate, normalize_proxy(settings.playerok_proxy))
                                 if inspection.valid and not inspection.join_requests:
                                     prefilled = await service.accept_prefilled_invite(str(deal.id), candidate.url, inspection.server_name or "Discord-сервер")
                             break
@@ -139,7 +140,7 @@ async def main() -> None:
             row = row or repository.waiting_for_confirmation(str(event.chat.id)) or repository.waiting_for_chat(str(event.chat.id))
             if row:
                 logger.info("Сообщение покупателя связано с заказом #%s", row["deal_id"])
-                await adapter.on_message(row["deal_id"], str(event.chat.id), str(getattr(message, "text", "") or ""))
+                await adapter.on_message(row["deal_id"], str(event.chat.id), str(getattr(message, "text", "") or ""), normalize_proxy(settings.playerok_proxy))
             else:
                 logger.warning("Сообщение покупателя %s не связано с ожидающей сделкой (chat_id=%s)", getattr(message, "id", "?"), event.chat.id)
             await plugins.dispatch(event.type.name, adapter, event)

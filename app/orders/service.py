@@ -27,7 +27,7 @@ class OrderService:
     def register_paid_deal(self, deal_id: str, chat_id: str, item_id: str, duration: str, quantity: int) -> bool:
         return self.repository.create(deal_id, chat_id, item_id, duration, quantity)
 
-    async def accept_message(self, deal_id: str, text: str) -> tuple[bool, str]:
+    async def accept_message(self, deal_id: str, text: str, proxy: str | None = None) -> tuple[bool, str]:
         order = self.repository.get(deal_id)
         if order is None:
             logger.warning("Сообщение для неизвестного заказа: %s", deal_id)
@@ -36,7 +36,7 @@ class OrderService:
             new_invite = extract_invite(text)
             if new_invite:
                 invite = new_invite
-                inspection = await inspect_invite(invite)
+                inspection = await inspect_invite(invite, proxy)
                 if not inspection.valid:
                     return False, "Ссылка недействительна или сервер недоступен для проверки."
                 if inspection.join_requests:
@@ -54,7 +54,7 @@ class OrderService:
             if invite is None:
                 logger.info("Заказ #%s: в сообщении нет Discord-инвайта", deal_id)
                 return False, "Отправьте Discord-ссылку в формате discord.gg/example."
-            inspection = await inspect_invite(invite)
+            inspection = await inspect_invite(invite, proxy)
             if not inspection.valid:
                 logger.info("Заказ #%s: Discord-инвайт не прошёл проверку", deal_id)
                 return False, "Ссылка недействительна или сервер недоступен для проверки."

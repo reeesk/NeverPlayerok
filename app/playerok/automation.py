@@ -18,7 +18,12 @@ class PlayerokAutomation:
 
     async def _notify(self, text: str) -> None:
         if self.enabled("notifications") and self.notify:
-            await self.notify(text)
+            try:
+                await self.notify(text)
+            except Exception as exc:
+                # A Telegram outage must not turn a successful Playerok action
+                # into a reported automation failure.
+                logger.warning("Не удалось отправить уведомление в Telegram: %s", exc)
 
     async def complete_deal(self, deal) -> None:
         if not self.enabled("auto_complete"):
@@ -47,8 +52,8 @@ class PlayerokAutomation:
             default = next((status for status in priorities if getattr(status, "price", 0) == 0), priorities[0])
             await asyncio.to_thread(self.account.publish_item, full_item.id, default.id)
             await self._notify(f"♻️ Товар <b>{source_name}</b> восстановлен после продажи")
-        except Exception:
-            logger.exception("Failed to restore item after deal %s", getattr(deal, "id", "?"))
+        except Exception as exc:
+            logger.warning("Не удалось восстановить товар после сделки %s: %s", getattr(deal, "id", "?"), exc)
 
     async def restore_expired(self) -> None:
         if not self.enabled("auto_restore"):
@@ -63,8 +68,8 @@ class PlayerokAutomation:
                 default = next((status for status in priorities if getattr(status, "price", 0) == 0), priorities[0])
                 await asyncio.to_thread(self.account.publish_item, full_item.id, default.id)
                 await asyncio.sleep(0.5)
-        except Exception:
-            logger.exception("Failed to restore expired items")
+        except Exception as exc:
+            logger.warning("Playerok не разрешил восстановление истёкших товаров: %s", exc)
 
     async def bump_all(self) -> None:
         if not self.enabled("auto_bump"):

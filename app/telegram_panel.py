@@ -7,9 +7,11 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.client.session.aiohttp import AiohttpSession
 
 from app.neverboost.client import NeverBoostClient, NeverBoostError
 from app.settings_store import SettingsStore
+from app.network import normalize_proxy
 import updater
 
 logger = logging.getLogger("neverboost-playerok.telegram")
@@ -226,7 +228,8 @@ class TelegramPanel:
             logger.warning("Telegram token is not configured")
             return
         logger.info("Telegram-панель запускается")
-        bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+        proxy = normalize_proxy(self.store.get("telegram", "proxy", default=""))
+        bot = Bot(token, session=AiohttpSession(proxy=proxy), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         dispatcher = Dispatcher()
         dispatcher.include_router(self.router)
         await dispatcher.start_polling(bot, allowed_updates=dispatcher.resolve_used_update_types())
@@ -235,7 +238,8 @@ class TelegramPanel:
         token = self.store.get("telegram", "token", default="")
         if not token:
             return
-        bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+        proxy = normalize_proxy(self.store.get("telegram", "proxy", default=""))
+        bot = Bot(token, session=AiohttpSession(proxy=proxy), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         try:
             for admin_id in self.store.get("telegram", "admins", default=[]):
                 await bot.send_message(int(admin_id), text)

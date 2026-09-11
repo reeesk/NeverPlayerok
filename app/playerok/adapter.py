@@ -33,8 +33,8 @@ class PlayerokEventAdapter:
                 "Пример: discord.gg/neverboost",
             )
 
-    async def on_message(self, deal_id: str, chat_id: str, text: str) -> None:
-        accepted, response = await self.orders.accept_message(deal_id, text)
+    async def on_message(self, deal_id: str, chat_id: str, text: str, proxy: str | None = None) -> None:
+        accepted, response = await self.orders.accept_message(deal_id, text, proxy)
         await self.transport.send_message(chat_id, response)
         if accepted:
             await self.orders.wait_for_completion(
