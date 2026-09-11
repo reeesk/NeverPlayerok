@@ -27,6 +27,26 @@ def back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ В главное меню", callback_data="screen:menu")]])
 
 
+FEATURE_INFO = {
+    "auto_restore": {
+        "title": "♻️ Автовосстановление товаров",
+        "description": "После продажи или истечения срока бот автоматически публикует товар снова, чтобы он продолжал продаваться.",
+    },
+    "auto_complete": {
+        "title": "✅ Автоподтверждение сделки",
+        "description": "Бот сам отмечает сделку как выполненную после оплаты. Включайте только если ваша выдача действительно происходит автоматически.",
+    },
+    "auto_bump": {
+        "title": "⬆️ Автоподнятие товаров",
+        "description": "Бот периодически поднимает ваши активные товары в поиске Playerok. Если для поднятия нужен платный статус, расход оплачивается в Playerok.",
+    },
+    "notifications": {
+        "title": "🔔 Уведомления",
+        "description": "Бот присылает администратору сообщения о новых заказах, восстановлении товаров, ошибках и изменениях статуса.",
+    },
+}
+
+
 class TelegramPanel:
     def __init__(self, store: SettingsStore, repository, base_url: str) -> None:
         self.store = store
@@ -140,10 +160,17 @@ class TelegramPanel:
             )
         elif screen == "features":
             features = self.store.get("features", default={})
-            text = "\n".join(f"{key}: {'✅' if value else '❌'}" for key, value in features.items())
-            buttons = [[InlineKeyboardButton(text=f"{'Выключить' if value else 'Включить'} {key}", callback_data=f"toggle:{key}")] for key, value in features.items()]
+            sections = []
+            buttons = []
+            for key, value in features.items():
+                info = FEATURE_INFO.get(key, {"title": key, "description": "Настройка функции бота."})
+                sections.append(f"{info['title']}\n{'🟢 Включено' if value else '⚪ Выключено'}\n<i>{info['description']}</i>")
+                buttons.append([InlineKeyboardButton(text=f"{'🔴 Выключить' if value else '🟢 Включить'}: {info['title']}", callback_data=f"toggle:{key}")])
             buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="screen:menu")])
-            await query.message.edit_text(f"⚙️ <b>Автоматизация</b>\n\n{text}\n\nНажмите кнопку, чтобы изменить настройку.", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+            await query.message.edit_text(
+                "⚙️ <b>Автоматизация магазина</b>\n\n" + "\n\n".join(sections) + "\n\n<i>Нажмите кнопку под нужной функцией, чтобы включить или выключить её.</i>",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            )
         elif screen == "lots":
             bindings = self.store.get("lot_bindings", default={})
             text = "\n".join(f"<code>{html.escape(str(key))}</code>: {value.get('duration')} • x{value.get('boosts_per_unit')}" for key, value in bindings.items()) or "Лоты не настроены"
