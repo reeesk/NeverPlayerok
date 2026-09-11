@@ -89,10 +89,13 @@ async def main() -> None:
         if row.get("status") == "processing" and str(row.get("api_order_id") or "").startswith("playerok-"):
             repository.update(row["deal_id"], status="untracked")
             logger.warning("Заказ #%s помечен untracked: старый локальный api_order_id не отслеживается API", row["deal_id"])
-            await telegram_panel.notify_admins(
-                f"⚠️ Заказ <code>{row['deal_id']}</code> был создан в старом формате API и не отслеживается. "
-                "Проверьте выдачу бустов вручную в личном кабинете NeverBoost."
-            )
+            try:
+                await telegram_panel.notify_admins(
+                    f"⚠️ Заказ <code>{row['deal_id']}</code> был создан в старом формате API и не отслеживается. "
+                    "Проверьте выдачу бустов вручную в личном кабинете NeverBoost."
+                )
+            except Exception as exc:
+                logger.warning("Уведомление об untracked-заказе не отправлено: %s", exc.__class__.__name__)
 
     async def handle(event) -> None:
         logger.info("Playerok event: %s, chat_id=%s", getattr(event.type, "name", event.type), getattr(event.chat, "id", "?"))

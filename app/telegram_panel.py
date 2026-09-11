@@ -246,6 +246,9 @@ class TelegramPanel:
         bot = Bot(token, session=AiohttpSession(proxy=proxy), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         try:
             for admin_id in self.store.get("telegram", "admins", default=[]):
-                await bot.send_message(int(admin_id), text)
+                try:
+                    await bot.send_message(int(admin_id), text)
+                except Exception as exc:
+                    logger.warning("Не удалось доставить уведомление админу %s: %s", admin_id, exc.__class__.__name__)
         finally:
             await bot.session.close()
