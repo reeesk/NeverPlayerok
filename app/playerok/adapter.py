@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 import re
+import asyncio
 
 
 @dataclass(frozen=True)
@@ -37,9 +38,11 @@ class PlayerokEventAdapter:
         accepted, response = await self.orders.accept_message(deal_id, text, proxy)
         await self.transport.send_message(chat_id, response)
         if accepted:
-            await self.orders.wait_for_completion(
-                deal_id,
-                lambda message: self.transport.send_message(chat_id, message),
+            asyncio.create_task(
+                self.orders.wait_for_completion(
+                    deal_id,
+                    lambda message: self.transport.send_message(chat_id, message),
+                )
             )
 
     @staticmethod

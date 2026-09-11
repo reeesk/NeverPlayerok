@@ -32,6 +32,7 @@ class OrderRepository:
                 "deal_id": deal_id, "chat_id": chat_id, "item_id": item_id,
                 "duration": duration, "quantity": quantity, "status": "waiting_invite",
                 "invite_url": None, "api_order_id": None,
+                "last_message_id": None,
             }
             self._save()
             return True
@@ -52,6 +53,10 @@ class OrderRepository:
         with self.lock:
             rows = [row for row in self.orders.values() if row.get("chat_id") == chat_id and row.get("status") == "waiting_invite"]
             return dict(rows[-1]) if rows else None
+
+    def active_confirmations(self) -> list[dict]:
+        with self.lock:
+            return [dict(row) for row in self.orders.values() if row.get("status") == "waiting_confirmation"]
 
     def waiting_for_confirmation(self, chat_id: str) -> dict | None:
         with self.lock:
