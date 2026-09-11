@@ -218,7 +218,11 @@ class TelegramPanel:
             try:
                 balance = await client.get_balance()
                 stock = await client.get_stock()
-                await query.message.edit_text(f"💰 <b>NeverBoost API</b>\n\nБаланс: <code>{html.escape(str(balance))}</code>\nСток: <code>{html.escape(str(stock))}</code>", reply_markup=back_keyboard())
+                prices = await client.get_prices()
+                await query.message.edit_text(
+                    f"💰 <b>NeverBoost API</b>\n\nБаланс: <code>{html.escape(str(balance))}</code>\nСток: <code>{html.escape(str(stock))}</code>\nЦены: <code>{html.escape(str(prices))}</code>",
+                    reply_markup=back_keyboard(),
+                )
             except NeverBoostError as exc:
                 await query.message.edit_text(f"❌ API недоступен: {html.escape(str(exc))}", reply_markup=back_keyboard())
 

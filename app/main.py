@@ -85,6 +85,15 @@ async def main() -> None:
     automation_task = asyncio.create_task(automation.background_loop())
     logger.info("Telegram-панель и автоматизация запущены")
 
+    for row in list(repository.orders.values()):
+        if row.get("status") == "processing" and str(row.get("api_order_id") or "").startswith("playerok-"):
+            repository.update(row["deal_id"], status="untracked")
+            logger.warning("Заказ #%s помечен untracked: старый локальный api_order_id не отслеживается API", row["deal_id"])
+            await telegram_panel.notify_admins(
+                f"⚠️ Заказ <code>{row['deal_id']}</code> был создан в старом формате API и не отслеживается. "
+                "Проверьте выдачу бустов вручную в личном кабинете NeverBoost."
+            )
+
     async def handle(event) -> None:
         logger.info("Playerok event: %s, chat_id=%s", getattr(event.type, "name", event.type), getattr(event.chat, "id", "?"))
         if event.type is EventTypes.NEW_DEAL or event.type is EventTypes.ITEM_PAID:

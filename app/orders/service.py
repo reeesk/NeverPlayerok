@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Awaitable, Callable
 
-from app.neverboost.client import NeverBoostClient, NeverBoostError
+from app.neverboost.client import NeverBoostClient, NeverBoostError, extract_order_id
 from app.orders.repository import OrderRepository
 
 logger = logging.getLogger("neverboost-playerok.orders")
@@ -61,11 +61,14 @@ class OrderService:
             if inspection.join_requests:
                 logger.info("Заказ #%s: на сервере включены заявки", deal_id)
                 return False, "На сервере включён вход по заявкам. Отключите заявки и отправьте новую ссылку."
-        api_order_id = f"playerok-{deal_id}"
         try:
-            await self.neverboost.create_order(api_order_id, order["duration"], invite.url, order["quantity"])
+            payload = await self.neverboost.create_order(order["duration"], invite.url, order["quantity"])
         except NeverBoostError as exc:
             return False, ERRORS.get(exc.reason or "", str(exc))
+        api_order_id = extract_order_id(payload)
+        if not api_order_id:
+            logger.error("NeverBoost API не вернул ID заказа для сделки %s: %s", deal_id, payload)
+            return False, "API не подтвердил создание заказа. Попробуйте отправить ссылку ещё раз."
         self.repository.update(deal_id, status="processing", invite_url=invite.url, api_order_id=api_order_id)
         logger.info("Заказ #%s переведён в processing, api_order_id=%s", deal_id, api_order_id)
         return True, "Заказ на выдачу бустов создан. Проверяю результат выдачи."
@@ -82,24 +85,35 @@ class OrderService:
         deal_id: str,
         notify: Callable[[str], Awaitable[None]],
         *,
-        attempts: int = 120,
+        attempts: int = 720,
         delay: float = 5,
+        max_consecutive_errors: int = 6,
     ) -> None:
         order = self.repository.get(deal_id)
         if order is None or not order["api_order_id"]:
             return
         api_order_id = str(order["api_order_id"])
+        consecutive_errors = 0
         for _ in range(attempts):
             try:
                 payload = await self.neverboost.get_order(api_order_id)
-            except NeverBoostError:
+                consecutive_errors = 0
+            except NeverBoostError as exc:
+                consecutive_errors += 1
+                if exc.status_code == 404 or consecutive_errors >= max_consecutive_errors:
+                    self.repository.update(deal_id, status="untracked")
+                    logger.error("Заказ #%s: API-заказ %s не найден (HTTP %s). Отслеживание остановлено.", deal_id, api_order_id, exc.status_code)
+                    await notify("Не удалось получить статус выдачи. Продавец проверит заказ вручную и напишет вам.")
+                    return
                 await asyncio.sleep(delay)
                 continue
             data = payload.get("order", payload)
             status = str(data.get("status", "")).lower() if isinstance(data, dict) else ""
-            if status not in {"completed", "partially_completed", "failed"}:
+            if status not in {"completed", "partially_completed", "partial", "failed"}:
                 await asyncio.sleep(delay)
                 continue
+            if status == "partial":
+                status = "partially_completed"
             boosted = int(data.get("boosted", 0) or 0)
             requested = int(data.get("requested", order["quantity"]) or order["quantity"])
             self.repository.update(deal_id, status=status)
