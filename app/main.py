@@ -15,6 +15,7 @@ from app.delivery.inspector import inspect_invite
 from app.plugins.manager import PluginManager
 from app.settings_store import SettingsStore
 from app.telegram_panel import TelegramPanel
+from app.logging_setup import configure_logging
 
 logger = logging.getLogger("neverboost-playerok")
 
@@ -29,11 +30,14 @@ def order_invite_message(quantity: int) -> str:
 
 
 async def main() -> None:
+    configure_logging()
+    logger.info("========== NeverPlayerok запускается ==========")
     load_dotenv()
     store = SettingsStore()
     settings = Settings.from_json()
     if not settings.neverboost_api_key:
         raise RuntimeError("NEVERBOOST_API_KEY is required")
+    logger.info("Конфигурация загружена: лотов=%d, plugins=%s, interval=%ss", len(store.get("lot_bindings", default={})), settings.plugins_dir, settings.poll_interval)
     repository = OrderRepository(settings.database_path)
     service = OrderService(repository, NeverBoostClient(settings.neverboost_url, settings.neverboost_api_key))
 
@@ -58,6 +62,7 @@ async def main() -> None:
             "укажите свежие cookies с token и __ddg5_ либо отдельные token/ddg5. "
             "Cookies должны соответствовать User-Agent и прокси."
         ) from exc
+    logger.info("Playerok авторизован: username=%s, account_id=%s", account.username, account.id)
 
     class Transport:
         async def send_message(self, chat_id: str, text: str) -> None:
@@ -68,7 +73,8 @@ async def main() -> None:
                 await asyncio.to_thread(account.send_message, chat_id=str(admin_id), text=text)
 
     plugins = PluginManager(settings.plugins_dir)
-    plugins.load()
+    loaded_plugins = plugins.load()
+    logger.info("Плагины загружены: %d", len(loaded_plugins))
     adapter = PlayerokEventAdapter(Transport(), service, plugins)
     automation = PlayerokAutomation(account, store, lambda text: panel_notify(text))
     async def panel_notify(text: str) -> None:
@@ -76,8 +82,10 @@ async def main() -> None:
     telegram_panel = TelegramPanel(store, repository, settings.neverboost_url)
     telegram_task = asyncio.create_task(telegram_panel.run())
     automation_task = asyncio.create_task(automation.background_loop())
+    logger.info("Telegram-панель и автоматизация запущены")
 
     async def handle(event) -> None:
+        logger.info("Playerok event: %s, chat_id=%s", getattr(event.type, "name", event.type), getattr(event.chat, "id", "?"))
         if event.type is EventTypes.NEW_DEAL or event.type is EventTypes.ITEM_PAID:
             deal = event.deal
             if event.type is EventTypes.NEW_DEAL:
@@ -89,6 +97,7 @@ async def main() -> None:
                 duration = str(binding.get("duration", "oneMonth"))
                 quantity = max(int(binding.get("boosts_per_unit", 1) or 1), 1)
                 if service.register_paid_deal(str(deal.id), str(event.chat.id), str(getattr(deal.item, "id", "")), duration, quantity):
+                    logger.info("Заказ #%s зарегистрирован: duration=%s, quantity=%d", deal.id, duration, quantity)
                     prefilled = None
                     has_invite_field = False
                     for field in getattr(deal, "obtaining_fields", None) or []:
@@ -104,6 +113,8 @@ async def main() -> None:
                         await adapter.transport.send_message(str(event.chat.id), prefilled)
                     elif not has_invite_field:
                         await adapter.transport.send_message(str(event.chat.id), order_invite_message(quantity))
+                else:
+                    logger.info("Заказ #%s уже существует, повторно не создаём", deal.id)
             else:
                 # ITEM_PAID is the reliable payment event. It may arrive even
                 # when the preceding NEW_DEAL payload had incomplete item data.
@@ -127,6 +138,7 @@ async def main() -> None:
             row = repository.get(str(message_deal)) if message_deal else None
             row = row or repository.waiting_for_confirmation(str(event.chat.id)) or repository.waiting_for_chat(str(event.chat.id))
             if row:
+                logger.info("Сообщение покупателя связано с заказом #%s", row["deal_id"])
                 await adapter.on_message(row["deal_id"], str(event.chat.id), str(getattr(message, "text", "") or ""))
             else:
                 logger.warning("Сообщение покупателя %s не связано с ожидающей сделкой (chat_id=%s)", getattr(message, "id", "?"), event.chat.id)
@@ -147,6 +159,7 @@ async def main() -> None:
             logger.exception("Playerok listener stopped")
 
     Thread(target=listen, name="playerok-listener", daemon=True).start()
+    logger.info("Playerok listener запущен")
     try:
         while True:
             await handle(await queue.get())

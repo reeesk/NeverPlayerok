@@ -33,6 +33,7 @@ class PlayerokAutomation:
     async def restore_sold_item(self, deal) -> None:
         if not self.enabled("auto_restore"):
             return
+        logger.info("Автовосстановление после продажи: deal=%s", getattr(deal, "id", "?"))
         try:
             from playerokapi.enums import ItemStatuses
             items = await asyncio.to_thread(self.account.get_my_items, statuses=[ItemStatuses.SOLD], count=24)
@@ -53,6 +54,7 @@ class PlayerokAutomation:
         if not self.enabled("auto_restore"):
             return
         try:
+            logger.info("Проверка истёкших товаров")
             from playerokapi.enums import ItemStatuses
             items = await asyncio.to_thread(self.account.get_my_items, statuses=[ItemStatuses.EXPIRED], count=100)
             for item in getattr(items, "items", items):
@@ -68,6 +70,7 @@ class PlayerokAutomation:
         if not self.enabled("auto_bump"):
             return
         try:
+            logger.info("Проверка товаров для автоподнятия")
             from playerokapi.enums import ItemStatuses, PriorityTypes
             items = await asyncio.to_thread(self.account.get_my_items, statuses=[ItemStatuses.APPROVED], count=100)
             for item in getattr(items, "items", items):
@@ -87,4 +90,5 @@ class PlayerokAutomation:
             except Exception:
                 logger.exception("Automation loop failed")
             interval = max(int(self.store.get("runtime", "automation_interval", default=3600)), 60)
+            logger.info("Следующая проверка автоматизации через %s сек.", interval)
             await asyncio.sleep(interval)

@@ -1,5 +1,8 @@
 from typing import Any
 import httpx
+import logging
+
+logger = logging.getLogger("neverboost-playerok.neverboost")
 
 
 class NeverBoostError(RuntimeError):
@@ -20,6 +23,7 @@ class NeverBoostClient:
         return headers
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
+        logger.info("NeverBoost API: %s %s", method, path)
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.request(method, f"{self.base_url}{path}", headers=self._headers(kwargs.pop("idempotency_key", None)), **kwargs)
         try:
@@ -36,9 +40,11 @@ class NeverBoostClient:
                         reason = candidate
                         break
             raise NeverBoostError(message, reason=reason)
+        logger.info("NeverBoost API: %s %s -> %s", method, path, response.status_code)
         return data if isinstance(data, dict) else {}
 
     async def create_order(self, order_id: str, duration: str, invite_url: str, count: int) -> dict[str, Any]:
+        logger.info("Создание NeverBoost-заказа: id=%s duration=%s count=%d", order_id, duration, count)
         return await self._request(
             "POST", "/boost",
             json={"order_id": order_id, "duration": duration, "url": invite_url, "count": count},
@@ -46,6 +52,7 @@ class NeverBoostClient:
         )
 
     async def get_order(self, order_id: str) -> dict[str, Any]:
+        logger.debug("Проверка NeverBoost-заказа: id=%s", order_id)
         return await self._request("GET", f"/order/{order_id}")
 
     async def get_stock(self) -> dict[str, Any]:

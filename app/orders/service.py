@@ -1,10 +1,13 @@
 from app.delivery.invite import extract_invite
 from app.delivery.inspector import inspect_invite
 import asyncio
+import logging
 from typing import Awaitable, Callable
 
 from app.neverboost.client import NeverBoostClient, NeverBoostError
 from app.orders.repository import OrderRepository
+
+logger = logging.getLogger("neverboost-playerok.orders")
 
 
 ERRORS = {
@@ -27,6 +30,7 @@ class OrderService:
     async def accept_message(self, deal_id: str, text: str) -> tuple[bool, str]:
         order = self.repository.get(deal_id)
         if order is None:
+            logger.warning("Сообщение для неизвестного заказа: %s", deal_id)
             return False, "Активный заказ не найден."
         if order["status"] == "waiting_confirmation":
             new_invite = extract_invite(text)
@@ -48,11 +52,14 @@ class OrderService:
         else:
             invite = extract_invite(text)
             if invite is None:
+                logger.info("Заказ #%s: в сообщении нет Discord-инвайта", deal_id)
                 return False, "Отправьте Discord-ссылку в формате discord.gg/example."
             inspection = await inspect_invite(invite)
             if not inspection.valid:
+                logger.info("Заказ #%s: Discord-инвайт не прошёл проверку", deal_id)
                 return False, "Ссылка недействительна или сервер недоступен для проверки."
             if inspection.join_requests:
+                logger.info("Заказ #%s: на сервере включены заявки", deal_id)
                 return False, "На сервере включён вход по заявкам. Отключите заявки и отправьте новую ссылку."
         api_order_id = f"playerok-{deal_id}"
         try:
@@ -60,6 +67,7 @@ class OrderService:
         except NeverBoostError as exc:
             return False, ERRORS.get(exc.reason or "", str(exc))
         self.repository.update(deal_id, status="processing", invite_url=invite.url, api_order_id=api_order_id)
+        logger.info("Заказ #%s переведён в processing, api_order_id=%s", deal_id, api_order_id)
         return True, "Заказ на выдачу бустов создан. Проверяю результат выдачи."
 
     async def accept_prefilled_invite(self, deal_id: str, invite_url: str, server_name: str) -> str | None:
@@ -95,6 +103,7 @@ class OrderService:
             boosted = int(data.get("boosted", 0) or 0)
             requested = int(data.get("requested", order["quantity"]) or order["quantity"])
             self.repository.update(deal_id, status=status)
+            logger.info("Заказ #%s завершён со статусом %s: %d/%d", deal_id, status, boosted, requested)
             if status == "completed":
                 await notify("Бусты успешно выданы. Пожалуйста, подтвердите выполнение сделки.")
             elif status == "partially_completed":

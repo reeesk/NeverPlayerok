@@ -35,6 +35,7 @@ class PluginManager:
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 self.plugins.append(Plugin(str(getattr(module, "NAME", path.stem)), module, path))
+                logger.info("Плагин загружен: %s", path.name)
             except Exception:
                 logger.exception("Cannot load plugin %s", path)
         return self.plugins
@@ -54,6 +55,7 @@ class PluginManager:
             if not handlers:
                 handlers = getattr(plugin.module, "EVENT_HANDLERS", {}).get(event_name, [])
             for handler in handlers:
+                logger.debug("Вызов плагина %s: %s", plugin.name, event_name)
                 result = handler(*args)
                 if inspect.isawaitable(result):
                     await result

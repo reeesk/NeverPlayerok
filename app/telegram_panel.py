@@ -225,10 +225,11 @@ class TelegramPanel:
         if not token:
             logger.warning("Telegram token is not configured")
             return
+        logger.info("Telegram-панель запускается")
         bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         dispatcher = Dispatcher()
         dispatcher.include_router(self.router)
-        await dispatcher.start_polling(bot)
+        await dispatcher.start_polling(bot, allowed_updates=dispatcher.resolve_used_update_types())
 
     async def notify_admins(self, text: str) -> None:
         token = self.store.get("telegram", "token", default="")
