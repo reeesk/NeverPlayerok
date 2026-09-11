@@ -22,3 +22,8 @@ def extract_invite(text: str) -> Invite | None:
     if match:
         return Invite(match.group(1))
     return None
+
+
+def is_invite_field(label: str) -> bool:
+    normalized = re.sub(r"[^a-zа-яё]+", " ", str(label or "").lower()).strip()
+    return "ссылка" in normalized and "discord" in normalized

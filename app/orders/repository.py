@@ -52,3 +52,8 @@ class OrderRepository:
         with self.lock:
             rows = [row for row in self.orders.values() if row.get("chat_id") == chat_id and row.get("status") == "waiting_invite"]
             return dict(rows[-1]) if rows else None
+
+    def waiting_for_confirmation(self, chat_id: str) -> dict | None:
+        with self.lock:
+            rows = [row for row in self.orders.values() if row.get("chat_id") == chat_id and row.get("status") == "waiting_confirmation"]
+            return dict(rows[-1]) if rows else None

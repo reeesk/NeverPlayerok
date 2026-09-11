@@ -10,6 +10,8 @@ from app.orders.repository import OrderRepository
 from app.orders.service import OrderService
 from app.playerok.adapter import PaidDeal, PlayerokEventAdapter
 from app.playerok.automation import PlayerokAutomation
+from app.delivery.invite import extract_invite, is_invite_field
+from app.delivery.inspector import inspect_invite
 from app.plugins.manager import PluginManager
 from app.settings_store import SettingsStore
 from app.telegram_panel import TelegramPanel
@@ -87,7 +89,21 @@ async def main() -> None:
                 duration = str(binding.get("duration", "oneMonth"))
                 quantity = max(int(binding.get("boosts_per_unit", 1) or 1), 1)
                 if service.register_paid_deal(str(deal.id), str(event.chat.id), str(getattr(deal.item, "id", "")), duration, quantity):
-                    await adapter.transport.send_message(str(event.chat.id), order_invite_message(quantity))
+                    prefilled = None
+                    has_invite_field = False
+                    for field in getattr(deal, "obtaining_fields", None) or []:
+                        if is_invite_field(getattr(field, "label", "")):
+                            has_invite_field = True
+                            candidate = extract_invite(getattr(field, "value", "") or "")
+                            if candidate:
+                                inspection = await inspect_invite(candidate)
+                                if inspection.valid and not inspection.join_requests:
+                                    prefilled = await service.accept_prefilled_invite(str(deal.id), candidate.url, inspection.server_name or "Discord-сервер")
+                            break
+                    if prefilled:
+                        await adapter.transport.send_message(str(event.chat.id), prefilled)
+                    elif not has_invite_field:
+                        await adapter.transport.send_message(str(event.chat.id), order_invite_message(quantity))
             else:
                 # ITEM_PAID is the reliable payment event. It may arrive even
                 # when the preceding NEW_DEAL payload had incomplete item data.
@@ -109,7 +125,7 @@ async def main() -> None:
                 return
             message_deal = getattr(getattr(message, "deal", None), "id", None)
             row = repository.get(str(message_deal)) if message_deal else None
-            row = row or repository.waiting_for_chat(str(event.chat.id))
+            row = row or repository.waiting_for_confirmation(str(event.chat.id)) or repository.waiting_for_chat(str(event.chat.id))
             if row:
                 await adapter.on_message(row["deal_id"], str(event.chat.id), str(getattr(message, "text", "") or ""))
             else:

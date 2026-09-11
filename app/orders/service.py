@@ -1,4 +1,5 @@
 from app.delivery.invite import extract_invite
+from app.delivery.inspector import inspect_invite
 import asyncio
 from typing import Awaitable, Callable
 
@@ -27,11 +28,32 @@ class OrderService:
         order = self.repository.get(deal_id)
         if order is None:
             return False, "Активный заказ не найден."
-        if order["status"] != "waiting_invite":
+        if order["status"] == "waiting_confirmation":
+            new_invite = extract_invite(text)
+            if new_invite:
+                invite = new_invite
+                inspection = await inspect_invite(invite)
+                if not inspection.valid:
+                    return False, "Ссылка недействительна или сервер недоступен для проверки."
+                if inspection.join_requests:
+                    return False, "На сервере включён вход по заявкам. Отключите заявки и отправьте новую ссылку."
+            elif text.strip().lower() in {"да", "да, выдавайте", "yes", "y"}:
+                invite = extract_invite(order.get("invite_url", ""))
+                if invite is None:
+                    return False, "Отправьте Discord-ссылку в формате discord.gg/example."
+            else:
+                return False, "Напишите «Да», чтобы подтвердить сервер, или отправьте другую Discord-ссылку."
+        elif order["status"] != "waiting_invite":
             return False, "Этот заказ уже обрабатывается."
-        invite = extract_invite(text)
-        if invite is None:
-            return False, "Отправьте Discord-ссылку в формате discord.gg/example."
+        else:
+            invite = extract_invite(text)
+            if invite is None:
+                return False, "Отправьте Discord-ссылку в формате discord.gg/example."
+            inspection = await inspect_invite(invite)
+            if not inspection.valid:
+                return False, "Ссылка недействительна или сервер недоступен для проверки."
+            if inspection.join_requests:
+                return False, "На сервере включён вход по заявкам. Отключите заявки и отправьте новую ссылку."
         api_order_id = f"playerok-{deal_id}"
         try:
             await self.neverboost.create_order(api_order_id, order["duration"], invite.url, order["quantity"])
@@ -39,6 +61,13 @@ class OrderService:
             return False, ERRORS.get(exc.reason or "", str(exc))
         self.repository.update(deal_id, status="processing", invite_url=invite.url, api_order_id=api_order_id)
         return True, "Заказ на выдачу бустов создан. Проверяю результат выдачи."
+
+    async def accept_prefilled_invite(self, deal_id: str, invite_url: str, server_name: str) -> str | None:
+        order = self.repository.get(deal_id)
+        if order is None or order["status"] != "waiting_invite":
+            return None
+        self.repository.update(deal_id, status="waiting_confirmation", invite_url=invite_url, server_name=server_name)
+        return f"✅ Нашёл Discord-сервер: <b>{server_name}</b>.\nВыдавать бусты на этот сервер? Ответьте: <b>Да</b> или отправьте другую ссылку."
 
     async def wait_for_completion(
         self,
