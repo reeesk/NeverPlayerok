@@ -38,11 +38,24 @@ class PlayerokEventAdapter:
         accepted, response = await self.orders.accept_message(deal_id, text, proxy)
         await self.transport.send_message(chat_id, response)
         if accepted:
-            asyncio.create_task(
+            task = asyncio.create_task(
                 self.orders.wait_for_completion(
                     deal_id,
                     lambda message: self.transport.send_message(chat_id, message),
                 )
+            )
+            task.add_done_callback(self._log_task_error)
+
+    @staticmethod
+    def _log_task_error(task: asyncio.Task) -> None:
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            import logging
+            logging.getLogger("neverboost-playerok.orders").error(
+                "Ошибка мониторинга заказа: %s", exc.__class__.__name__
             )
 
     @staticmethod

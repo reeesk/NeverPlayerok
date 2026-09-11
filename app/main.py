@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from threading import Thread
-from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
@@ -164,45 +163,6 @@ async def main() -> None:
                 repository.update(str(event.deal.id), status="cancelled")
             await plugins.dispatch(event.type.name, adapter, event)
 
-    async def poll_confirmation_messages() -> None:
-        """Fallback for Playerok accounts where chatMessageCreated is missed."""
-        while True:
-            try:
-                for order in repository.active_confirmations():
-                    if not order.get("confirmation_at"):
-                        repository.update(order["deal_id"], confirmation_at=datetime.now(timezone.utc).isoformat())
-                        logger.warning("Заказ #%s получил точку отсечения старых сообщений; попросите покупателя повторить подтверждение", order["deal_id"])
-                        continue
-                    try:
-                        result = await asyncio.to_thread(account.get_chat_messages, order["chat_id"], 12)
-                        messages = list(getattr(result, "messages", result) or [])
-                    except Exception as exc:
-                        logger.warning("Не удалось получить историю чата %s: %s", order["chat_id"], exc.__class__.__name__)
-                        continue
-                    messages.sort(key=lambda message: str(getattr(message, "created_at", "") or ""), reverse=True)
-                    for message in messages:
-                        message_id = str(getattr(message, "id", "") or "")
-                        if not message_id or message_id == order.get("last_message_id"):
-                            continue
-                        if getattr(getattr(message, "user", None), "id", None) == account.id:
-                            continue
-                        created_at = str(getattr(message, "created_at", "") or "")
-                        if created_at and created_at <= str(order["confirmation_at"]):
-                            continue
-                        message_deal_id = str(getattr(getattr(message, "deal", None), "id", "") or "")
-                        if message_deal_id and message_deal_id != order["deal_id"]:
-                            continue
-                        text = str(getattr(message, "text", "") or "").strip()
-                        if text.lower() not in {"да", "да, выдавайте", "yes", "y"} and not extract_invite(text):
-                            continue
-                        repository.update(order["deal_id"], last_message_id=message_id)
-                        logger.info("Fallback нашёл сообщение покупателя для заказа #%s", order["deal_id"])
-                        await adapter.on_message(order["deal_id"], order["chat_id"], text, normalize_proxy(settings.playerok_proxy))
-                        break
-            except Exception:
-                logger.exception("Ошибка fallback-проверки сообщений")
-            await asyncio.sleep(max(settings.poll_interval, 3))
-
     queue: asyncio.Queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
 
@@ -215,14 +175,12 @@ async def main() -> None:
 
     Thread(target=listen, name="playerok-listener", daemon=True).start()
     logger.info("Playerok listener запущен")
-    confirmation_poll_task = asyncio.create_task(poll_confirmation_messages())
     try:
         while True:
             await handle(await queue.get())
     finally:
         telegram_task.cancel()
         automation_task.cancel()
-        confirmation_poll_task.cancel()
 
 
 if __name__ == "__main__":

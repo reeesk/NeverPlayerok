@@ -39,7 +39,7 @@ class NeverBoostClient:
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.request(method, f"{self.base_url}{path}", headers=self._headers(), **kwargs)
-        except httpx.HTTPError as exc:
+        except Exception as exc:
             logger.warning("NeverBoost API: %s %s -> %s", method, path, exc.__class__.__name__)
             raise NeverBoostError(f"NeverBoost API недоступен: {exc.__class__.__name__}") from exc
         try:
